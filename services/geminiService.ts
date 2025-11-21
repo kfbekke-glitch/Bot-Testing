@@ -2,19 +2,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 export const getStyleAdvice = async (userQuery: string): Promise<string> => {
-  let apiKey = '';
-  
-  // ULTRA-SAFE WAY to access process.env
-  // This prevents "ReferenceError: process is not defined" in browsers
-  try {
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env) {
-      // @ts-ignore
-      apiKey = process.env.API_KEY || '';
-    }
-  } catch (e) {
-    // ignore completely
-  }
+  const apiKey = ''; // Temporarily empty for browser preview safety
 
   if (!apiKey) {
     console.warn("Gemini API Key is missing");

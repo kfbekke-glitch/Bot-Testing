@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Button } from './ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BARBERS, SERVICES } from '../constants';
@@ -61,6 +61,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking }) => {
     if (prices.length === 0) return null;
     return Math.min(...prices);
   };
+
+  const sortedBarbers = useMemo(() => {
+    return [...BARBERS].sort((a, b) => b.rating - a.rating);
+  }, []);
 
   return (
     <div className="space-y-8 pb-24 pt-4">
@@ -125,7 +129,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking }) => {
           onMouseMove={handleMouseMove}
           className="flex overflow-x-auto px-4 gap-4 no-scrollbar pb-4 cursor-grab active:cursor-grabbing select-none"
         >
-          {BARBERS.map((barber) => (
+          {sortedBarbers.map((barber) => (
             <div 
               key={barber.id} 
               onClick={() => handleBarberClick(barber)}

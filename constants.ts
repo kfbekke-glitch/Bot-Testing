@@ -46,7 +46,8 @@ export const BARBERS: Barber[] = [
     name: 'Алекс "Maverick"',
     tier: 'Top Barber',
     description: 'Виртуоз классики и удлиненных стрижек. Опыт 7 лет. Бренд-амбассадор барбер-культуры. Стрижет долго, дорого, идеально.',
-    image: 'https://images.unsplash.com/photo-1567894340315-735d7c361db0?w=800&auto=format&fit=crop&q=60',
+    // Stylish, confident, suit/coat
+    image: 'https://i.pinimg.com/736x/76/02/bd/7602bdc241afa97a3aca511420dc1c6d.jpg',
     rating: 5.0,
     tags: ['🗣️ Любит поболтать', '📸 Перфекционист', '☕ Кофеман'],
     workDays: [1, 3, 4, 5, 6], // Mon, Wed, Thu, Fri, Sat
@@ -63,7 +64,8 @@ export const BARBERS: Barber[] = [
     name: 'Виктор "Viking"',
     tier: 'Beard Expert',
     description: 'Специалист по сложным бородам и брутальным образам. Знает о бритье всё. Если нужна идеальная геометрия бороды — вам к нему.',
-    image: 'https://images.unsplash.com/photo-1531891437562-4301cf35b7e4?w=800&auto=format&fit=crop&q=60',
+    // Brutal, heavy beard, tattoos
+    image: 'https://i.pinimg.com/736x/4d/07/6e/4d076e0dd826ede7dd619d7fd004b67f.jpg', 
     rating: 4.9,
     tags: ['🪓 Брутал', '🤫 Спокойный', '🧔 Борода'],
     workDays: [2, 4, 5, 6, 0], // Tue, Thu, Fri, Sat, Sun
@@ -80,7 +82,8 @@ export const BARBERS: Barber[] = [
     name: 'Костя "Fade"',
     tier: 'Senior Barber',
     description: 'Мастер коротких форм. Фейд любой сложности, Кроп, Цезарь. Быстрота и точность движений. Опыт 5 лет.',
-    image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&auto=format&fit=crop&q=60',
+    // Fade expert, Black barber
+    image: 'https://i.pinimg.com/736x/93/e5/d4/93e5d48dd43aa8e73f3bfb078a3f5fbe.jpg',
     rating: 4.8,
     tags: ['⚽ Футбол', '🎮 Геймер', '🔥 Смелые стрижки'],
     workDays: [1, 2, 3, 4, 5], // Mon-Fri
@@ -97,7 +100,8 @@ export const BARBERS: Barber[] = [
     name: 'Дмитрий',
     tier: 'Middle Barber',
     description: 'Универсал с уклоном в уличный стиль. Отлично работает с текстурой. Внимателен к пожеланиям клиента. Опыт 3 года.',
-    image: 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=800&auto=format&fit=crop&q=60',
+    // Middle, street style, beanie/cap
+    image: 'https://i.pinimg.com/736x/c1/36/6d/c1366d39b6756b7f3f5e6d519502039d.jpg',
     rating: 4.7,
     tags: ['🎧 Музыка', '🛹 Стритвир', '👂 Слушатель'],
     workDays: [3, 4, 5, 6, 0], // Wed-Sun
@@ -114,7 +118,8 @@ export const BARBERS: Barber[] = [
     name: 'Макс',
     tier: 'Junior Barber',
     description: 'Молодой талант. Работает медленнее топов, но с запредельной старательностью. Проходит обучение у старших мастеров.',
-    image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&auto=format&fit=crop&q=60',
+    // Junior, Young
+    image: 'https://i.pinimg.com/736x/aa/ee/91/aaee910ede5a733ac29b39c454cab8b1.jpg',
     rating: 4.5,
     tags: ['🐢 Старательный', '👶 Молодой', '🎓 Ученик'],
     workDays: [1, 2, 3, 4, 5, 6, 0], // Everyday grinder
@@ -129,15 +134,17 @@ export const BARBERS: Barber[] = [
     id: 'b6',
     name: 'Сергей Палыч',
     tier: 'Old School',
-    description: 'Легенда заведения. Только классика, только ножницы, только хардкор. Опыт более 15 лет. Молчалив и сосредоточен.',
-    image: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=800&auto=format&fit=crop&q=60',
+    description: 'Легенда заведения. Опыт более 20 лет. Мастер старой закалки. Не любит разговоры, делает свою работу идеально.',
+    // Old School, Older
+    image: 'https://i.pinimg.com/736x/67/8f/73/678f737e830170b1b26cc708442e3808.jpg',
     rating: 5.0,
-    tags: ['🗿 Молчун', '⚡ Быстро', '🥃 Классика'],
-    workDays: [5, 6, 0], // Fri, Sat, Sun only
+    tags: ['🥃 Олдскул', '🤐 Молчун', '✂️ Только ножницы'],
+    workDays: [5, 6, 0],
     services: [
-      { serviceId: 's1', price: 2000, durationMinutes: 45 },
-      { serviceId: 's7', price: 2500, durationMinutes: 60 }, 
-      { serviceId: 's5', price: 3500, durationMinutes: 75 },
+      { serviceId: 's1', price: 3000, durationMinutes: 60 },
+      { serviceId: 's2', price: 2000, durationMinutes: 45 },
+      { serviceId: 's3', price: 4500, durationMinutes: 90 },
+      { serviceId: 's7', price: 3000, durationMinutes: 60 },
     ]
   },
 ];

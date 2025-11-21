@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Calendar as CalendarIcon, User, Scissors, Clock, Coffee, Sun, Moon, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, User, Scissors, Clock, Sun, Sunset, Moon, PhoneCall } from 'lucide-react';
 import { BARBERS, SERVICES } from '../constants';
 import { Barber, Service, Booking, TimeSlot, BarberServiceOffer } from '../types';
 
@@ -13,6 +13,7 @@ interface BookingWizardProps {
   initialServiceId?: string;
 }
 
+// Helper to get current Moscow Time parts safely
 const getMskTimeParts = () => {
   const now = new Date();
   try {
@@ -33,11 +34,12 @@ const getMskTimeParts = () => {
     };
     
     const year = getPart('year');
-    const month = getPart('month') - 1; 
+    const month = getPart('month') - 1; // JS months are 0-indexed
     const day = getPart('day');
     const hour = getPart('hour');
     const minute = getPart('minute');
 
+    // If any part is invalid, return fallback immediately without throwing
     if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute)) {
        return {
          year: now.getFullYear(),
@@ -50,6 +52,7 @@ const getMskTimeParts = () => {
 
     return { year, month, day, hour, minute };
   } catch (e) {
+    // Absolute Fallback
     return {
       year: now.getFullYear(),
       month: now.getMonth(),
@@ -88,6 +91,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, onComple
   const [selectedServiceDetails, setSelectedServiceDetails] = useState<Service | null>(null);
   const [mskTime, setMskTime] = useState(() => getMskTimeParts());
 
+  // Form State
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -124,6 +128,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, onComple
     if (initialServiceId) {
       list = BARBERS.filter(b => b.services.some(s => s.serviceId === initialServiceId));
     }
+    // Sort by Rating Descending
     return [...list].sort((a, b) => b.rating - a.rating);
   }, [initialServiceId]);
 
@@ -144,29 +149,30 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, onComple
     return selectedBarber.workDays.includes(selectedDate.getDay());
   }, [selectedBarber, selectedDate]);
 
-  const existingBookingOnDate = useMemo(() => {
-    if (isNaN(selectedDate.getTime())) return null;
-    
-    return bookings.find(b => {
+  // One Booking Per Day Check
+  const hasExistingBookingOnDate = useMemo(() => {
+    if (isNaN(selectedDate.getTime())) return false;
+    return bookings.some(b => {
       if (b.status !== 'confirmed') return false;
       const bDate = new Date(b.date);
       if (isNaN(bDate.getTime())) return false;
-      
       return bDate.getDate() === selectedDate.getDate() &&
              bDate.getMonth() === selectedDate.getMonth() &&
              bDate.getFullYear() === selectedDate.getFullYear();
     });
-  }, [selectedDate, bookings]);
+  }, [bookings, selectedDate]);
 
   const timeSlots = useMemo(() => {
     const slots: TimeSlot[] = [];
     if (isNaN(selectedDate.getTime())) return slots;
     
-    if (existingBookingOnDate) return slots;
-
     if (selectedBarber && !selectedBarber.workDays.includes(selectedDate.getDay())) {
       return slots;
     }
+
+    // Note: We allow calculation of slots even if user has booking, 
+    // but we will hide them in UI and show the "Contact Admin" message instead.
+    // This keeps logic clean.
 
     let slotsNeeded = 1;
     if (selectedServiceOffer) {
@@ -265,21 +271,24 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, onComple
     }
 
     return slots;
-  }, [selectedDate, mskTime, bookings, selectedBarber, selectedServiceOffer, existingBookingOnDate]);
+  }, [selectedDate, mskTime, bookings, selectedBarber, selectedServiceOffer]);
 
+  // Group slots by time of day
   const groupedSlots = useMemo(() => {
-    const morning: TimeSlot[] = [];
-    const day: TimeSlot[] = [];
-    const evening: TimeSlot[] = [];
+    const groups = {
+      morning: [] as TimeSlot[], // 10:00 - 12:00
+      day: [] as TimeSlot[],     // 12:00 - 17:00
+      evening: [] as TimeSlot[]  // 17:00 - 21:00
+    };
 
     timeSlots.forEach(slot => {
-      const hour = parseInt(slot.time.split(':')[0], 10);
-      if (hour < 12) morning.push(slot);
-      else if (hour < 17) day.push(slot);
-      else evening.push(slot);
+      const [h] = slot.time.split(':').map(Number);
+      if (h < 12) groups.morning.push(slot);
+      else if (h < 17) groups.day.push(slot);
+      else groups.evening.push(slot);
     });
 
-    return { morning, day, evening };
+    return groups;
   }, [timeSlots]);
 
   const formatDate = (date: Date) => {
@@ -417,9 +426,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, onComple
   };
 
   const handleDateClick = (date: Date, disabled: boolean) => {
-    if (disabled) {
-      return;
-    }
+    if (disabled) return;
     if (dragDist.current < 5) {
       setSelectedDate(date);
     }
@@ -442,13 +449,14 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, onComple
     }).filter((item): item is { offer: BarberServiceOffer; details: Service } => item !== null);
   };
 
-  const renderTimeGroup = (title: string, icon: React.ReactNode, slots: TimeSlot[]) => {
+  const renderTimeSection = (title: string, icon: React.ReactNode, slots: TimeSlot[]) => {
     if (slots.length === 0) return null;
     return (
-      <div className="mb-4">
-        <div className="flex items-center gap-2 mb-2 px-1">
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-3 text-zinc-500 px-1">
           {icon}
-          <span className="text-[10px] font-bold uppercase text-zinc-500 tracking-wider">{title}</span>
+          <span className="text-xs font-bold uppercase tracking-wider">{title}</span>
+          <div className="h-px flex-1 bg-zinc-800/50"></div>
         </div>
         <div className="grid grid-cols-4 gap-3">
           {slots.map((slot) => (
@@ -623,33 +631,38 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, onComple
                 {formatDate(selectedDate)}
               </h3>
 
-              {existingBookingOnDate ? (
-                <div className="mt-8 p-6 bg-red-900/10 border border-red-900/30 rounded-xl flex items-start gap-4">
-                   <AlertCircle className="text-red-500 shrink-0" size={24} />
-                   <div>
-                     <h4 className="text-red-500 font-bold uppercase text-sm mb-1">Вы уже записаны</h4>
-                     <p className="text-zinc-400 text-xs leading-relaxed">
-                       На эту дату у вас уже есть активная запись. Пожалуйста, выберите другой день или отмените текущую запись в разделе "Мои Записи".
-                     </p>
-                   </div>
-                </div>
-              ) : !isWorkingDay ? (
+              {!isWorkingDay ? (
                  <div className="mt-8 p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl text-center border-dashed">
                     <p className="text-zinc-400 font-bold uppercase text-sm mb-2">Мастер не работает</p>
                     <p className="text-xs text-zinc-600">Выберите другую дату для записи к {selectedBarber?.name}</p>
                  </div>
+              ) : hasExistingBookingOnDate ? (
+                <div className="mt-8 p-6 bg-zinc-900/50 border border-amber-600/20 rounded-xl text-center">
+                   <p className="text-white font-bold uppercase text-sm mb-2">У вас уже есть запись на {formatDate(selectedDate)}</p>
+                   <p className="text-xs text-zinc-500 mb-6 leading-relaxed">
+                     Система разрешает одну запись в день. <br/>
+                     Хотите добавить еще одну услугу на этот день?
+                   </p>
+                   <a 
+                     href="tel:+79805470406"
+                     className="inline-flex items-center gap-2 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors border border-zinc-700 hover:border-amber-600"
+                   >
+                     <PhoneCall size={16} className="text-amber-600" />
+                     Позвонить администратору
+                   </a>
+                </div>
               ) : (
                 <>
-                  {groupedSlots.morning.length === 0 && groupedSlots.day.length === 0 && groupedSlots.evening.length === 0 && (
-                    <div className="mt-8 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl text-center">
-                      <p className="text-zinc-400 text-sm mb-1">На эту дату нет свободного времени.</p>
-                      <p className="text-xs text-zinc-600">Пожалуйста, выберите другой день.</p>
-                    </div>
-                  )}
+                  {renderTimeSection('Утро', <Sun size={16} />, groupedSlots.morning)}
+                  {renderTimeSection('День', <Sun size={16} className="text-amber-500" />, groupedSlots.day)}
+                  {renderTimeSection('Вечер', <Moon size={16} className="text-blue-400" />, groupedSlots.evening)}
 
-                  {renderTimeGroup('Утро', <Coffee size={14} />, groupedSlots.morning)}
-                  {renderTimeGroup('День', <Sun size={14} />, groupedSlots.day)}
-                  {renderTimeGroup('Вечер', <Moon size={14} />, groupedSlots.evening)}
+                  {timeSlots.every(s => !s.available) && timeSlots.length > 0 && (
+                     <div className="mt-8 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl text-center">
+                        <p className="text-zinc-400 text-sm mb-1">На эту дату нет свободного времени.</p>
+                        <p className="text-xs text-zinc-600">Пожалуйста, выберите другой день.</p>
+                     </div>
+                  )}
                 </>
               )}
             </motion.div>
