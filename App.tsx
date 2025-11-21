@@ -69,12 +69,6 @@ const App: React.FC = () => {
             setServerBookings(normalizedServerBookings);
 
             // b) SYNC LOGIC: Check if local bookings are still valid on server
-            // We need the raw server data to check IDs or slots
-            // Since the simple GET endpoint might only return active bookings,
-            // If a local booking ID is NOT in the returned data (and it should be), it means Admin deleted it.
-            // NOTE: This requires the GET endpoint to return IDs or unique keys. 
-            // Assuming our GET returns simple objects {date, timeSlot, barberId}, we match by that.
-            
             let hasChanges = false;
             const updatedLocalBookings = currentLocalBookings.map(localBooking => {
               if (localBooking.status === 'cancelled') return localBooking;
@@ -145,7 +139,8 @@ const App: React.FC = () => {
         method: 'POST',
         mode: 'no-cors', 
         headers: {
-          'Content-Type': 'application/json',
+          // Using text/plain avoids CORS preflight checks which often fail with Google Scripts
+          'Content-Type': 'text/plain;charset=utf-8',
         },
         body: JSON.stringify(payload),
       });
@@ -173,7 +168,10 @@ const App: React.FC = () => {
          await fetch(GOOGLE_SCRIPT_URL, {
           method: 'POST',
           mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            // Using text/plain ensures the request goes through without CORS errors
+            'Content-Type': 'text/plain;charset=utf-8' 
+          },
           body: JSON.stringify({ 
             ...bookingToCancel, 
             id: bookingToCancel.id,

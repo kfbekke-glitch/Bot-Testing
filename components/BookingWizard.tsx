@@ -162,16 +162,45 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
     return selectedBarber.workDays.includes(selectedDate.getDay());
   }, [selectedBarber, selectedDate]);
 
+  // Check if a given ISO string date matches the currently selected Moscow date
+  // robustly, regardless of client timezone
+  const isSameMskDay = (isoDate: string, selected: Date) => {
+    try {
+      const d = new Date(isoDate);
+      if (isNaN(d.getTime())) return false;
+
+      // Convert booking date to Moscow Time parts
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Moscow',
+        day: 'numeric',
+        month: 'numeric',
+        year: 'numeric'
+      }).formatToParts(d);
+
+      const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0', 10);
+      const day = getPart('day');
+      const month = getPart('month') - 1; // 0-indexed
+      const year = getPart('year');
+
+      // Compare with selectedDate (which is already representing a Moscow day)
+      return day === selected.getDate() && 
+             month === selected.getMonth() && 
+             year === selected.getFullYear();
+    } catch (e) {
+      // Fallback for environments where Intl might fail
+      const d = new Date(isoDate);
+      return d.getDate() === selected.getDate() && 
+             d.getMonth() === selected.getMonth() && 
+             d.getFullYear() === selected.getFullYear();
+    }
+  };
+
   // One Booking Per Day Check - Using ONLY userBookings (Critical Fix)
   const hasExistingBookingOnDate = useMemo(() => {
     if (isNaN(selectedDate.getTime())) return false;
     return userBookings.some(b => {
       if (b.status !== 'confirmed') return false;
-      const bDate = new Date(b.date);
-      if (isNaN(bDate.getTime())) return false;
-      return bDate.getDate() === selectedDate.getDate() &&
-             bDate.getMonth() === selectedDate.getMonth() &&
-             bDate.getFullYear() === selectedDate.getFullYear();
+      return isSameMskDay(b.date, selectedDate);
     });
   }, [userBookings, selectedDate]);
 
@@ -210,15 +239,11 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
     const occupiedTimes = new Set<string>();
 
     if (selectedBarber) {
-      // Availability Check - Using ALL bookings (server + local)
+      // Availability Check - Using ALL bookings (server + local) to block time
       const dayBookings = bookings.filter(b => {
         if (b.status !== 'confirmed') return false;
         if (b.barberId !== selectedBarber.id) return false;
-        const bDate = new Date(b.date);
-        if (isNaN(bDate.getTime())) return false;
-        return bDate.getDate() === selectedDate.getDate() &&
-               bDate.getMonth() === selectedDate.getMonth() &&
-               bDate.getFullYear() === selectedDate.getFullYear();
+        return isSameMskDay(b.date, selectedDate);
       });
 
       dayBookings.forEach(booking => {
