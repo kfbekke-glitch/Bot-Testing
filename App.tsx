@@ -16,21 +16,11 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5ek0lwgnxsC
 const normalizeDate = (raw: any): string => {
   if (!raw) return '';
   const s = String(raw);
-  // If it looks like ISO with T21:00 (common Google Sheets offset for previous day)
-  // We want to treat the date part as the source of truth if possible, 
-  // BUT if it's 21:00Z it usually means the Next Day in Moscow.
-  // However, simpler approach: The app now sends YYYY-MM-DD. 
-  // If we receive YYYY-MM-DD, just use it.
   if (s.match(/^\d{4}-\d{2}-\d{2}$/)) return s;
   
-  // Fallback for legacy ISO strings: try to adjust for Moscow (UTC+3)
   try {
     const d = new Date(s);
-    // If invalid date, return original string
     if (isNaN(d.getTime())) return s;
-    
-    // Add 3 hours to handle the T21:00:00.000Z issue (which is 00:00 MSK)
-    // This ensures Nov 22 21:00Z becomes Nov 23 00:00Z
     const offsetDate = new Date(d.getTime() + (3 * 60 * 60 * 1000));
     return offsetDate.toISOString().split('T')[0];
   } catch(e) {
@@ -51,7 +41,6 @@ const normalizeTimeSlot = (raw: any): string => {
     try {
       const d = new Date(s);
       if (!isNaN(d.getTime())) {
-        // Force UTC get to avoid browser shift if possible, or just use local
         const h = d.getUTCHours().toString().padStart(2, '0');
         const m = d.getUTCMinutes().toString().padStart(2, '0');
         return `${h}:${m}`;
@@ -127,7 +116,7 @@ const App: React.FC = () => {
             const duration = item.duration || getFallbackDuration(bId, sId);
 
             return {
-              id: item.id ? String(item.id) : `server_${Math.random()}`, // Ensure ID is string
+              id: item.id ? String(item.id) : `server_${Math.random()}`, 
               barberId: bId,
               serviceId: sId,
               date: cleanDate,
@@ -155,15 +144,12 @@ const App: React.FC = () => {
             setAuthenticatedUserBookings(localBookings.filter(b => b.status === 'confirmed'));
           }
 
-          // Sync cancellation status from server to local
           if (localBookings.length > 0) {
             let hasChanges = false;
             const serverBookingIds = new Set(normalizedServerBookings.map(b => String(b.id)));
             
             const updatedLocalBookings = localBookings.map(localBooking => {
               const isJustCreated = (Date.now() - localBooking.createdAt) < 15000;
-
-              // If local says confirmed, but server doesn't have it (and it wasn't just created), mark cancelled
               if (localBooking.status === 'confirmed' && !serverBookingIds.has(String(localBooking.id)) && !isJustCreated) {
                 hasChanges = true;
                 return { ...localBooking, status: 'cancelled' as const };
@@ -194,7 +180,6 @@ const App: React.FC = () => {
   const handleBookingComplete = async (bookingData: Omit<Booking, 'id' | 'status' | 'createdAt'>) => {
     const tgUser = getTelegramUser();
 
-    // NOTE: bookingData.date is now passed as YYYY-MM-DD string from BookingWizard
     const newBooking: Booking = {
       ...bookingData,
       id: Math.random().toString(36).substr(2, 9),
@@ -229,9 +214,8 @@ const App: React.FC = () => {
   };
 
   const handleCancelBooking = async (id: string) => {
-    const targetId = String(id); // Ensure strict string comparison
+    const targetId = String(id);
 
-    // 1. Local Update
     const updated = localBookings.map(b => 
       String(b.id) === targetId ? { ...b, status: 'cancelled' as const } : b
     );
@@ -241,9 +225,7 @@ const App: React.FC = () => {
       String(b.id) === targetId ? { ...b, status: 'cancelled' as const } : b
     ));
 
-    // 2. Server Update
     try {
-      // Find full booking object to send correct cancellation payload
       let bookingToCancel = localBookings.find(b => String(b.id) === targetId);
       if (!bookingToCancel) {
          bookingToCancel = serverBookings.find(b => String(b.id) === targetId);
@@ -283,14 +265,14 @@ const App: React.FC = () => {
   
   const allOccupiedBookings = [...serverBookings];
   localBookings.forEach(localB => {
-    // Add local booking if it's confirmed and not already in server list
     if (localB.status === 'confirmed' && !allOccupiedBookings.some(serverB => String(serverB.id) === String(localB.id))) {
       allOccupiedBookings.push(localB);
     }
   });
 
   return (
-    <div className="bg-zinc-950 text-zinc-100 font-sans h-[100dvh] max-w-md mx-auto relative overflow-hidden shadow-2xl flex flex-col">
+    // Changed: used 'fixed inset-0' to lock the app to the viewport perfectly on Android
+    <div className="bg-zinc-950 text-zinc-100 font-sans fixed inset-0 w-full max-w-md mx-auto overflow-hidden shadow-2xl flex flex-col">
       <Header />
       <main className="flex-1 relative overflow-hidden w-full">
         <AnimatePresence initial={false}>

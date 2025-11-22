@@ -6,6 +6,9 @@ declare global {
       WebApp: {
         ready: () => void;
         expand: () => void;
+        setHeaderColor: (color: string) => void;
+        setBackgroundColor: (color: string) => void;
+        enableClosingConfirmation: () => void;
         initDataUnsafe?: {
           user?: {
             id: number;
@@ -29,8 +32,19 @@ export const initTelegramApp = () => {
     window.Telegram.WebApp.ready();
     try {
       window.Telegram.WebApp.expand();
+      // Force the Telegram header to match our app background
+      // This fixes the white bar issue on some devices
+      if (window.Telegram.WebApp.setHeaderColor) {
+        window.Telegram.WebApp.setHeaderColor('#09090b');
+      }
+      if (window.Telegram.WebApp.setBackgroundColor) {
+        window.Telegram.WebApp.setBackgroundColor('#09090b');
+      }
+      if (window.Telegram.WebApp.enableClosingConfirmation) {
+        window.Telegram.WebApp.enableClosingConfirmation();
+      }
     } catch (e) {
-      console.warn('Telegram expand failed', e);
+      console.warn('Telegram init failed', e);
     }
   }
 };

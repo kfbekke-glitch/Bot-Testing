@@ -4,8 +4,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <!-- Fix for Android Status Bar & Telegram Header -->
+    <meta name="theme-color" content="#09090b" />
+    <meta name="msapplication-navbutton-color" content="#09090b" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
     <title>BarberTesters</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      // Immediate execution to force Telegram Header color before React loads
+      (function() {
+        if (window.Telegram && window.Telegram.WebApp) {
+          var tg = window.Telegram.WebApp;
+          try {
+            // Force header and background to match app dark theme immediately
+            tg.setHeaderColor('#09090b'); 
+            tg.setBackgroundColor('#09090b');
+            tg.expand();
+            tg.ready();
+          } catch (e) {
+            console.log('TG Setup Error:', e);
+          }
+        }
+      })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -29,6 +52,7 @@
             },
             spacing: {
               'safe-bottom': 'env(safe-area-inset-bottom)',
+              'safe-top': 'env(safe-area-inset-top)',
             }
           }
         }
@@ -36,12 +60,21 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-      body {
+      html, body {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Crucial for fixed layout */
         background-color: #09090b;
         color: #e4e4e7;
         font-family: 'Inter', sans-serif;
         -webkit-tap-highlight-color: transparent;
-        overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
+        overscroll-behavior-y: none;
+      }
+      #root {
+        height: 100%;
+        width: 100%;
       }
       /* Hide scrollbar for clean mobile look but keep functionality */
       .no-scrollbar::-webkit-scrollbar {
