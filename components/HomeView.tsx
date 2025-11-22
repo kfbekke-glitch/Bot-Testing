@@ -3,14 +3,15 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Button } from './ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BARBERS, SERVICES } from '../constants';
-import { Star, X, Percent, ArrowRight, Clock, Trophy, Quote, ShieldCheck, MapPin, Phone, ExternalLink } from 'lucide-react';
+import { Star, X, Percent, ArrowRight, Clock, Trophy, Quote, ShieldCheck, MapPin, Phone, ExternalLink, WifiOff } from 'lucide-react';
 import { Barber } from '../types';
 
 interface HomeViewProps {
   onStartBooking: (barberId?: string, serviceId?: string) => void;
+  isOffline?: boolean;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking, isOffline = false }) => {
   const [isServicesOpen, setIsServicesOpen] = useState(false);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
   
@@ -84,8 +85,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking }) => {
             Мужская территория
           </p>
           
-          <Button onClick={() => onStartBooking()} fullWidth className="py-4 text-lg bg-white text-black font-black tracking-widest hover:bg-zinc-200 border-none">
-            ЗАПИСАТЬСЯ
+          <Button 
+            onClick={() => onStartBooking()} 
+            fullWidth 
+            className={`py-4 text-lg font-black tracking-widest border-none ${isOffline ? 'bg-zinc-700 text-zinc-400' : 'bg-white text-black hover:bg-zinc-200'}`}
+          >
+            {isOffline ? 'НЕТ СЕТИ' : 'ЗАПИСАТЬСЯ'}
           </Button>
         </motion.div>
       </section>
@@ -94,7 +99,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking }) => {
       <section className="px-4">
         <div 
           onClick={() => onStartBooking(undefined, 's5')}
-          className="relative bg-amber-600 rounded-xl p-5 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+          className={`
+            relative rounded-xl p-5 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform
+            ${isOffline ? 'bg-zinc-800 opacity-70 grayscale' : 'bg-amber-600'}
+          `}
         >
           <div className="absolute inset-0 opacity-10 bg-[linear-gradient(45deg,#000_25%,transparent_25%,transparent_50%,#000_50%,#000_75%,transparent_75%,transparent)] bg-[length:20px_20px]" />
           
@@ -108,7 +116,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking }) => {
               <p className="text-black/80 text-xs font-bold mt-1 max-w-[80%]">Семейная стрижка по специальной цене.</p>
             </div>
             <div className="bg-black/10 p-2 rounded-full text-black">
-              <Percent size={24} />
+              {isOffline ? <WifiOff size={24} /> : <Percent size={24} />}
             </div>
           </div>
         </div>
@@ -282,9 +290,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking }) => {
                     </p>
                     <button 
                       onClick={() => { setIsServicesOpen(false); onStartBooking(undefined, service.id); }}
-                      className="flex items-center gap-2 text-xs font-bold uppercase text-amber-600 mt-2 hover:text-amber-500 transition-colors"
+                      disabled={isOffline}
+                      className={`flex items-center gap-2 text-xs font-bold uppercase mt-2 transition-colors ${isOffline ? 'text-zinc-600' : 'text-amber-600 hover:text-amber-500'}`}
                     >
-                      Записаться <ArrowRight size={14} />
+                      {isOffline ? 'Нет сети' : 'Записаться'} {!isOffline && <ArrowRight size={14} />}
                     </button>
                   </div>
                 )
@@ -402,9 +411,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartBooking }) => {
                     setSelectedBarber(null);
                     onStartBooking(id); 
                   }}
-                  className="py-4 text-lg"
+                  className={`py-4 text-lg ${isOffline ? 'bg-zinc-800 text-zinc-500' : ''}`}
                 >
-                   Записаться к мастеру
+                   {isOffline ? 'Нет соединения' : 'Записаться к мастеру'}
                 </Button>
               </div>
 

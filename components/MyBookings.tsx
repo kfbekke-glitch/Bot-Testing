@@ -2,12 +2,13 @@
 import React, { useState } from 'react';
 import { Booking } from '../types';
 import { BARBERS, SERVICES } from '../constants';
-import { Calendar, Clock, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Trash2, WifiOff } from 'lucide-react';
 import { Modal } from './ui/Modal';
 
 interface MyBookingsProps {
   bookings: Booking[];
   onCancelBooking: (id: string) => void;
+  isOffline?: boolean;
 }
 
 // Helper to safely extract time from potentially malformed strings
@@ -27,7 +28,7 @@ const cleanTimeDisplay = (time: string) => {
   return time;
 }
 
-export const MyBookings: React.FC<MyBookingsProps> = ({ bookings, onCancelBooking }) => {
+export const MyBookings: React.FC<MyBookingsProps> = ({ bookings, onCancelBooking, isOffline = false }) => {
   const [cancelId, setCancelId] = useState<string | null>(null);
 
   const handleConfirmCancel = () => {
@@ -153,10 +154,17 @@ export const MyBookings: React.FC<MyBookingsProps> = ({ bookings, onCancelBookin
 
             {booking.status === 'confirmed' && (
               <button 
-                onClick={() => setCancelId(booking.id)}
-                className="w-full py-3 rounded-xl border border-zinc-800 text-zinc-400 text-sm font-medium hover:bg-red-900/10 hover:text-red-500 hover:border-red-900/30 transition-colors flex items-center justify-center gap-2"
+                onClick={() => isOffline ? null : setCancelId(booking.id)}
+                disabled={isOffline}
+                className={`
+                   w-full py-3 rounded-xl border text-sm font-medium transition-colors flex items-center justify-center gap-2
+                   ${isOffline 
+                     ? 'border-zinc-800 text-zinc-600 cursor-not-allowed' 
+                     : 'border-zinc-800 text-zinc-400 hover:bg-red-900/10 hover:text-red-500 hover:border-red-900/30'}
+                `}
               >
-                <Trash2 size={16} /> Отменить запись
+                {isOffline ? <WifiOff size={16} /> : <Trash2 size={16} />}
+                {isOffline ? 'Нет сети' : 'Отменить запись'}
               </button>
             )}
           </div>

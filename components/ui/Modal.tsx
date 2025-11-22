@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X } from 'lucide-react';
@@ -9,9 +10,10 @@ interface ModalProps {
   onConfirm: () => void;
   title: string;
   description: string;
+  singleButton?: boolean;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, description }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, description, singleButton = false }) => {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -48,8 +50,10 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title,
               </div>
 
               <div className="flex gap-3 mt-8 justify-end">
-                <Button variant="outline" onClick={onClose} className="text-sm py-2">Нет, оставить</Button>
-                <Button variant="danger" onClick={onConfirm} className="text-sm py-2">Да, отменить</Button>
+                {!singleButton && (
+                   <Button variant="outline" onClick={onClose} className="text-sm py-2">Нет, оставить</Button>
+                )}
+                <Button variant="danger" onClick={onConfirm} className="text-sm py-2">{singleButton ? 'Понятно' : 'Да, отменить'}</Button>
               </div>
             </div>
           </motion.div>

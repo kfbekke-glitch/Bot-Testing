@@ -9,6 +9,8 @@ import { AppView, Booking } from './types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { initTelegramApp, getTelegramUser } from './utils/telegram';
 import { BARBERS } from './constants';
+import { WifiOff } from 'lucide-react';
+import { Modal } from './components/ui/Modal';
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5ek0lwgnxsC8Bc0TJ6DWhCvQK9-Lr6sSAGF0Z0IEASWCp09R2N3eCE2yZiY6l17_B/exec';
 
@@ -58,6 +60,8 @@ const normalizeTimeSlot = (raw: any): string => {
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [showOfflineAlert, setShowOfflineAlert] = useState(false);
   
   const [preSelectedBarberId, setPreSelectedBarberId] = useState<string | undefined>(undefined);
   const [preSelectedServiceId, setPreSelectedServiceId] = useState<string | undefined>(undefined);
@@ -71,7 +75,10 @@ const App: React.FC = () => {
     try {
       const saved = localStorage.getItem('barber_bookings');
       if (saved) {
-        setLocalBookings(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setLocalBookings(parsed);
+        // Initialize authenticated view from local cache immediately
+        setAuthenticatedUserBookings(parsed.filter((b: Booking) => b.status === 'confirmed'));
       }
     } catch (e) {
       console.warn("Could not load bookings from storage");
@@ -94,17 +101,31 @@ const App: React.FC = () => {
      return service ? service.durationMinutes : 45;
   };
 
+  // Helper to fetch with timeout and simple retry
+  const fetchWithRetry = async (url: string, retries = 2, timeout = 12000) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        const response = await fetch(url, { 
+            redirect: 'follow',
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        if (response.ok) return response;
+      } catch (err) {
+        if (i === retries - 1) throw err;
+        await new Promise(res => setTimeout(res, 1000)); // Wait 1s before retry
+      }
+    }
+    throw new Error('Max retries reached');
+  };
+
   const fetchServerBookings = useCallback(async () => {
       try {
-        const response = await fetch(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`, {
-          method: 'GET',
-          redirect: 'follow'
-        });
+        // Use robust fetch with timeout
+        const response = await fetchWithRetry(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
         const data = await response.json();
 
         if (Array.isArray(data)) {
@@ -130,7 +151,9 @@ const App: React.FC = () => {
               tgUserId: item.tgUserId ? String(item.tgUserId) : undefined
             };
           });
+          
           setServerBookings(normalizedServerBookings);
+          setIsOffline(false); // Connection healthy
 
           const tgUser = getTelegramUser();
           
@@ -164,6 +187,8 @@ const App: React.FC = () => {
         }
       } catch (e) {
         console.error("Failed to fetch server bookings:", e);
+        setIsOffline(true); // Connection failed
+        // Fallback to local storage for authenticated view so user sees something
         setAuthenticatedUserBookings(localBookings.filter(b => b.status === 'confirmed'));
       }
   }, [localBookings]); 
@@ -172,12 +197,17 @@ const App: React.FC = () => {
     fetchServerBookings();
     const intervalId = setInterval(() => {
       fetchServerBookings();
-    }, 4000); 
+    }, 5000); 
     return () => clearInterval(intervalId);
   }, [fetchServerBookings]);
 
 
   const handleBookingComplete = async (bookingData: Omit<Booking, 'id' | 'status' | 'createdAt'>) => {
+    if (isOffline) {
+      setShowOfflineAlert(true);
+      return;
+    }
+
     const tgUser = getTelegramUser();
 
     const newBooking: Booking = {
@@ -205,6 +235,9 @@ const App: React.FC = () => {
       setTimeout(fetchServerBookings, 1000);
     } catch (e) {
       console.error("Failed to sync booking with server", e);
+      setIsOffline(true);
+      // If it failed immediately, inform user
+      setShowOfflineAlert(true);
     }
 
     setIsBookingOpen(false);
@@ -214,6 +247,11 @@ const App: React.FC = () => {
   };
 
   const handleCancelBooking = async (id: string) => {
+    if (isOffline) {
+      setShowOfflineAlert(true);
+      return;
+    }
+
     const targetId = String(id);
 
     const updated = localBookings.map(b => 
@@ -247,10 +285,15 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error("Failed to sync cancellation", e);
+      setIsOffline(true);
     }
   };
 
   const handleStartBooking = (barberId?: string, serviceId?: string) => {
+    if (isOffline) {
+      setShowOfflineAlert(true);
+      return;
+    }
     fetchServerBookings(); 
     setPreSelectedBarberId(barberId);
     setPreSelectedServiceId(serviceId);
@@ -271,12 +314,29 @@ const App: React.FC = () => {
   });
 
   return (
-    // Replaced 'fixed inset-0' with dynamic height variable to fix Android layout issues
     <div 
       style={{ height: 'var(--tg-viewport-height, 100vh)' }}
       className="bg-zinc-950 text-zinc-100 font-sans w-full max-w-md mx-auto overflow-hidden shadow-2xl flex flex-col relative"
     >
       <Header />
+      
+      {/* Offline Indicator */}
+      <AnimatePresence>
+        {isOffline && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-red-900/20 border-b border-red-900/30 overflow-hidden relative z-20 shrink-0"
+          >
+            <div className="px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-bold uppercase text-red-500 tracking-wider">
+              <WifiOff size={12} />
+              <span>Нет соединения. Функции ограничены.</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main className="flex-1 relative overflow-hidden w-full">
         <AnimatePresence initial={false}>
           {currentView === AppView.HOME && (
@@ -288,7 +348,7 @@ const App: React.FC = () => {
                transition={{ duration: 0.2 }}
                className="absolute inset-0 overflow-y-auto no-scrollbar w-full h-full"
              >
-               <HomeView onStartBooking={handleStartBooking} />
+               <HomeView onStartBooking={handleStartBooking} isOffline={isOffline} />
              </motion.div>
           )}
 
@@ -301,7 +361,11 @@ const App: React.FC = () => {
               transition={{ duration: 0.2 }}
               className="absolute inset-0 overflow-y-auto no-scrollbar w-full h-full"
             >
-              <MyBookings bookings={authenticatedUserBookings} onCancelBooking={handleCancelBooking} />
+              <MyBookings 
+                bookings={authenticatedUserBookings} 
+                onCancelBooking={handleCancelBooking}
+                isOffline={isOffline}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -323,10 +387,21 @@ const App: React.FC = () => {
               onCancel={handleCloseBooking} 
               initialBarberId={preSelectedBarberId}
               initialServiceId={preSelectedServiceId}
+              isOffline={isOffline}
             />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Offline Blocking Alert */}
+      <Modal 
+        isOpen={showOfflineAlert}
+        onClose={() => setShowOfflineAlert(false)}
+        onConfirm={() => setShowOfflineAlert(false)}
+        title="Связь потеряна"
+        description="К сожалению, сейчас нет доступа к серверу. Чтобы избежать ошибок в расписании, запись и отмена недоступны до восстановления связи."
+        singleButton={true}
+      />
     </div>
   );
 };

@@ -5,6 +5,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
+    <!-- Network Optimizations -->
+    <link rel="preconnect" href="https://script.google.com" />
+    <link rel="preconnect" href="https://aistudiocdn.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
     <!-- Fix for Android Status Bar & Telegram Header -->
     <meta name="theme-color" content="#09090b" />
     <meta name="msapplication-navbutton-color" content="#09090b" />
@@ -116,6 +122,27 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      /* Initial Loader Styles (Critical CSS) */
+      .app-loader {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        z-index: 9999;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #27272a;
+        border-bottom-color: #d97706;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
     <script type="importmap">
       {
@@ -131,7 +158,22 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Immediate Loading State to prevent blank screen -->
+      <div class="app-loader">
+        <div class="spinner"></div>
+        <div style="color: #52525b; font-family: monospace; font-size: 12px; text-transform: uppercase;">Загрузка...</div>
+      </div>
+    </div>
+    <script>
+       // Failsafe: If React takes too long (slow network), tell Telegram we are ready anyway
+       // so it doesn't show the infinite spinner overlay.
+       setTimeout(function() {
+         if(window.Telegram && window.Telegram.WebApp) {
+           window.Telegram.WebApp.ready();
+         }
+       }, 3000);
+    </script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

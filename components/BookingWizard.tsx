@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Calendar as CalendarIcon, User, Scissors, Clock, Sun, Moon, PhoneCall, X } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, User, Scissors, Clock, Sun, Moon, PhoneCall, X, WifiOff } from 'lucide-react';
 import { BARBERS, SERVICES } from '../constants';
 import { Barber, Service, Booking, TimeSlot, BarberServiceOffer } from '../types';
 import { getTelegramUser, triggerHaptic } from '../utils/telegram';
@@ -13,6 +13,7 @@ interface BookingWizardProps {
   onCancel: () => void;
   initialBarberId?: string;
   initialServiceId?: string;
+  isOffline?: boolean;
 }
 
 const getMskTimeParts = () => {
@@ -78,7 +79,7 @@ const getDateKey = (date: Date | string): string => {
   }
 };
 
-export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBookings, onComplete, onCancel, initialBarberId, initialServiceId }) => {
+export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBookings, onComplete, onCancel, initialBarberId, initialServiceId, isOffline = false }) => {
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(() => {
     if (initialBarberId) {
       return BARBERS.find(b => b.id === initialBarberId) || null;
@@ -292,6 +293,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
   const handleNext = async () => {
     triggerHaptic('impact', 'light');
     if (step === 4) {
+      if (isOffline) {
+        triggerHaptic('notification', 'error');
+        return;
+      }
       setIsSubmitting(true);
       triggerHaptic('notification', 'success');
       let finalPrice = selectedServiceOffer!.price;
@@ -431,9 +436,6 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
       </div>
     );
   };
-
-  // Rest of component (render) matches original logic but with updated styles
-  // ... (Standard Render Logic) ...
 
   return (
     <div className="fixed inset-0 bg-zinc-950 z-50 flex flex-col h-full w-full">
@@ -641,8 +643,22 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
                 </div>
               </div>
               <div className="fixed bottom-0 left-0 right-0 p-4 bg-zinc-950 border-t border-zinc-900 z-20">
-                 <button onClick={handleNext} disabled={!canProceed() || isSubmitting} className="w-full py-4 bg-white text-black font-black uppercase tracking-widest rounded-none hover:bg-zinc-200 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
-                   {isSubmitting ? <><span className="animate-spin h-4 w-4 border-2 border-black border-t-transparent rounded-full"/> ОТПРАВКА...</> : 'ПОДТВЕРДИТЬ ЗАПИСЬ'}
+                 <button 
+                  onClick={handleNext} 
+                  disabled={!canProceed() || isSubmitting || isOffline} 
+                  className={`
+                    w-full py-4 font-black uppercase tracking-widest rounded-none transition-transform flex items-center justify-center gap-2
+                    ${isOffline 
+                      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' 
+                      : 'bg-white text-black hover:bg-zinc-200 active:scale-[0.98]'}
+                    disabled:opacity-50
+                  `}
+                >
+                   {isSubmitting 
+                      ? <><span className="animate-spin h-4 w-4 border-2 border-black border-t-transparent rounded-full"/> ОТПРАВКА...</> 
+                      : isOffline 
+                        ? <><WifiOff size={18} /> НЕТ СОЕДИНЕНИЯ</>
+                        : 'ПОДТВЕРДИТЬ ЗАПИСЬ'}
                  </button>
               </div>
             </motion.div>
