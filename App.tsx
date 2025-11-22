@@ -271,8 +271,11 @@ const App: React.FC = () => {
   });
 
   return (
-    // Changed: used 'fixed inset-0' to lock the app to the viewport perfectly on Android
-    <div className="bg-zinc-950 text-zinc-100 font-sans fixed inset-0 w-full max-w-md mx-auto overflow-hidden shadow-2xl flex flex-col">
+    // Replaced 'fixed inset-0' with dynamic height variable to fix Android layout issues
+    <div 
+      style={{ height: 'var(--tg-viewport-height, 100vh)' }}
+      className="bg-zinc-950 text-zinc-100 font-sans w-full max-w-md mx-auto overflow-hidden shadow-2xl flex flex-col relative"
+    >
       <Header />
       <main className="flex-1 relative overflow-hidden w-full">
         <AnimatePresence initial={false}>

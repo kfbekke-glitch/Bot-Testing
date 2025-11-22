@@ -13,21 +13,48 @@
     <title>BarberTesters</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-      // Immediate execution to force Telegram Header color before React loads
-      (function() {
-        if (window.Telegram && window.Telegram.WebApp) {
-          var tg = window.Telegram.WebApp;
-          try {
-            // Force header and background to match app dark theme immediately
-            tg.setHeaderColor('#09090b'); 
-            tg.setBackgroundColor('#09090b');
-            tg.expand();
-            tg.ready();
-          } catch (e) {
-            console.log('TG Setup Error:', e);
-          }
+      // 1. Dynamic Viewport Height Fix for Android
+      // This calculates the exact height available in the Telegram Webview
+      function setViewportHeight() {
+        var vh = window.innerHeight;
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.viewportHeight) {
+          vh = window.Telegram.WebApp.viewportHeight;
         }
-      })();
+        document.documentElement.style.setProperty('--tg-viewport-height', vh + 'px');
+      }
+
+      // 2. Aggressive Header Color Fix
+      // Retry setting the color multiple times to ensure it 'sticks' on slower Androids
+      function forceHeaderColor() {
+        if (window.Telegram && window.Telegram.WebApp) {
+          try {
+            window.Telegram.WebApp.setHeaderColor('#09090b');
+            window.Telegram.WebApp.setBackgroundColor('#09090b');
+            window.Telegram.WebApp.expand();
+          } catch (e) {}
+        }
+      }
+
+      window.addEventListener('resize', setViewportHeight);
+      
+      // Execute immediately and subscribe to events
+      if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.onEvent('viewportChanged', setViewportHeight);
+        setViewportHeight();
+        forceHeaderColor();
+        
+        // Retry loop for 2 seconds
+        var retries = 0;
+        var interval = setInterval(function() {
+          forceHeaderColor();
+          setViewportHeight();
+          retries++;
+          if (retries > 20) clearInterval(interval);
+        }, 100);
+      } else {
+        // Fallback for browser testing
+        setViewportHeight();
+      }
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -51,8 +78,8 @@
               mono: ['JetBrains Mono', 'monospace'],
             },
             spacing: {
-              'safe-bottom': 'env(safe-area-inset-bottom)',
-              'safe-top': 'env(safe-area-inset-top)',
+              'safe-bottom': 'env(safe-area-inset-bottom, 0px)',
+              'safe-top': 'env(safe-area-inset-top, 0px)',
             }
           }
         }
@@ -60,23 +87,28 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-      html, body {
-        height: 100%;
-        width: 100%;
+      :root {
+        --tg-viewport-height: 100vh;
+      }
+      html {
+        background-color: #09090b !important;
+      }
+      body {
         margin: 0;
         padding: 0;
-        overflow: hidden; /* Crucial for fixed layout */
-        background-color: #09090b;
+        overflow: hidden; /* Prevent body scroll, handle inside app */
+        background-color: #09090b !important;
         color: #e4e4e7;
         font-family: 'Inter', sans-serif;
         -webkit-tap-highlight-color: transparent;
         overscroll-behavior-y: none;
+        height: var(--tg-viewport-height);
+        width: 100%;
       }
       #root {
         height: 100%;
         width: 100%;
       }
-      /* Hide scrollbar for clean mobile look but keep functionality */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
