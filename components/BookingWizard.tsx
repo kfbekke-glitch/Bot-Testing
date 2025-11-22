@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Calendar as CalendarIcon, User, Scissors, Clock, Sun, Moon, PhoneCall } from 'lucide-react';
@@ -195,9 +194,14 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
       return slots;
     }
 
+    // Logic to calculate how many slots the SELECTED service needs
     let slotsNeeded = 1;
     if (selectedServiceOffer) {
       const d = selectedServiceOffer.durationMinutes;
+      // 30 min slots logic:
+      // <= 35m = 1 slot (30m)
+      // <= 65m = 2 slots (60m) - e.g. 45m or 60m service takes 2 slots
+      // <= 95m = 3 slots (90m)
       if (d <= 35) slotsNeeded = 1;
       else if (d <= 65) slotsNeeded = 2;
       else if (d <= 95) slotsNeeded = 3;
@@ -208,9 +212,11 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
     const endHour = 21; 
     const allDayIntervals: { time: string; isBlocked: boolean }[] = [];
 
+    // STRICT string generation: HH:MM with zero padding
     for (let h = startHour; h < endHour; h++) {
       ['00', '30'].forEach(m => {
-        allDayIntervals.push({ time: `${h}:${m}`, isBlocked: false });
+        const hStr = h.toString().padStart(2, '0');
+        allDayIntervals.push({ time: `${hStr}:${m}`, isBlocked: false });
       });
     }
 
@@ -221,39 +227,49 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
 
     const occupiedTimes = new Set<string>();
 
-    // FIX: Filter bookings by the selected barber to prevent global time slot blocking.
+    // 1. FILTER Bookings for THIS BARBER ONLY
     const dayBookings = bookings.filter(b => {
       if (b.status !== 'confirmed') return false;
-      if (b.barberId !== selectedBarber.id) return false;
+      if (String(b.barberId) !== String(selectedBarber.id)) return false;
       return getDateKey(b.date) === selectedKey;
     });
 
+    // 2. BLOCK slots based on existing booking durations
     dayBookings.forEach(booking => {
-      const duration = booking.duration || 45;
+      const duration = booking.duration || 45; // Default to 45 if missing
       let bookingSlotsCount = 1;
+      
+      // Same logic as slotsNeeded above
       if (duration <= 35) bookingSlotsCount = 1;
       else if (duration <= 65) bookingSlotsCount = 2;
       else if (duration <= 95) bookingSlotsCount = 3;
       else bookingSlotsCount = Math.ceil(duration / 30);
 
-      let checkTime = booking.timeSlot;
+      // Normalize check time to ensure format match (e.g. 9:00 -> 09:00)
+      const [bh, bm] = booking.timeSlot.split(':').map(Number);
+      let checkTime = `${bh.toString().padStart(2, '0')}:${bm.toString().padStart(2, '0')}`;
+
       for (let i = 0; i < bookingSlotsCount; i++) {
         occupiedTimes.add(checkTime);
         checkTime = addMinutesToTime(checkTime, 30);
       }
     });
 
+    // 3. Mark intervals as blocked
     allDayIntervals.forEach(interval => {
       const intervalMins = timeToMinutes(interval.time);
       
+      // Block past times if today
       if (isToday && intervalMins <= currentMskMinutes) {
         interval.isBlocked = true;
       }
+      // Block occupied times
       if (occupiedTimes.has(interval.time)) {
         interval.isBlocked = true;
       }
     });
 
+    // 4. Generate final selectable slots (checking if selected service FITS)
     for (let i = 0; i < allDayIntervals.length; i++) {
       const startSlot = allDayIntervals[i];
       
@@ -266,15 +282,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
         continue;
       }
 
+      // Check if subsequent slots needed for duration are also free
       let canFit = true;
       for (let j = 1; j < slotsNeeded; j++) {
         const nextIndex = i + j;
         if (nextIndex >= allDayIntervals.length) {
-          canFit = false;
+          canFit = false; // Exceeds working hours
           break;
         }
         if (allDayIntervals[nextIndex].isBlocked) {
-          canFit = false;
+          canFit = false; // Overlaps with another booking
           break;
         }
       }

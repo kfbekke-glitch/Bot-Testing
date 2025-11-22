@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomeView } from './components/HomeView';
@@ -8,6 +8,7 @@ import { MyBookings } from './components/MyBookings';
 import { AppView, Booking } from './types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { initTelegramApp, getTelegramUser } from './utils/telegram';
+import { BARBERS } from './constants';
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5ek0lwgnxsC8Bc0TJ6DWhCvQK9-Lr6sSAGF0Z0IEASWCp09R2N3eCE2yZiY6l17_B/exec';
 
@@ -28,25 +29,39 @@ const App: React.FC = () => {
   // authenticatedUserBookings = Bookings from server that belong to THIS Telegram user (Personal History)
   const [authenticatedUserBookings, setAuthenticatedUserBookings] = useState<Booking[]>([]);
 
-  // Load bookings from local storage on mount and init Telegram
+  // Load bookings from local storage on mount
   useEffect(() => {
     initTelegramApp();
-    
-    let currentLocalBookings: Booking[] = [];
-
-    // 1. Load Local History (Fallback)
     try {
       const saved = localStorage.getItem('barber_bookings');
       if (saved) {
-        currentLocalBookings = JSON.parse(saved);
-        setLocalBookings(currentLocalBookings);
+        setLocalBookings(JSON.parse(saved));
       }
     } catch (e) {
       console.warn("Could not load bookings from storage");
     }
+  }, []);
 
-    // 2. Fetch Occupied Slots from Server AND Sync Status
-    const fetchServerBookings = async () => {
+  // Save local bookings helper
+  const saveLocalBookings = (newBookings: Booking[]) => {
+    setLocalBookings(newBookings);
+    try {
+      localStorage.setItem('barber_bookings', JSON.stringify(newBookings));
+    } catch (e) {
+      console.warn("Could not save bookings to storage");
+    }
+  };
+
+  // Helper to recover duration if server fails to send it
+  const getFallbackDuration = (barberId: string, serviceId: string): number => {
+     const barber = BARBERS.find(b => String(b.id) === String(barberId));
+     if (!barber) return 45;
+     const service = barber.services.find(s => String(s.serviceId) === String(serviceId));
+     return service ? service.durationMinutes : 45;
+  };
+
+  // Centralized Data Fetching Function
+  const fetchServerBookings = useCallback(async () => {
       try {
         // Add timestamp to prevent caching
         const response = await fetch(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`, {
@@ -62,20 +77,29 @@ const App: React.FC = () => {
 
         if (Array.isArray(data)) {
           // a) Update Server Bookings (for blocking slots globally)
-          const normalizedServerBookings: Booking[] = data.map((item: any) => ({
-            id: item.id || `server_${Math.random()}`,
-            barberId: item.barberId,
-            serviceId: item.serviceId || 'unknown',
-            date: item.date, // ISO string
-            timeSlot: item.timeSlot,
-            clientName: item.clientName || 'Occupied',
-            clientPhone: '',
-            price: item.price || 0,
-            duration: item.duration || 45, 
-            status: 'confirmed',
-            createdAt: item.createdAt || 0,
-            tgUserId: item.tgUserId ? String(item.tgUserId) : undefined
-          }));
+          const normalizedServerBookings: Booking[] = data.map((item: any) => {
+            const bId = item.barberId ? String(item.barberId) : 'unknown';
+            const sId = item.serviceId || 'unknown';
+            
+            // Critical: If duration is 0 or missing, lookup the standard duration for this service
+            // This ensures a 60min haircut actually blocks 60mins even if DB is empty
+            const duration = item.duration || getFallbackDuration(bId, sId);
+
+            return {
+              id: item.id || `server_${Math.random()}`,
+              barberId: bId,
+              serviceId: sId,
+              date: item.date, // ISO string
+              timeSlot: item.timeSlot,
+              clientName: item.clientName || 'Occupied',
+              clientPhone: '',
+              price: item.price || 0,
+              duration: duration, 
+              status: 'confirmed',
+              createdAt: item.createdAt || 0,
+              tgUserId: item.tgUserId ? String(item.tgUserId) : undefined
+            };
+          });
           setServerBookings(normalizedServerBookings);
 
           // b) CROSS-DEVICE SYNC: Find my bookings on the server
@@ -88,44 +112,49 @@ const App: React.FC = () => {
             );
             setAuthenticatedUserBookings(myServerBookings);
           } else {
-            setAuthenticatedUserBookings(currentLocalBookings.filter(b => b.status === 'confirmed'));
+            // Fallback for non-telegram users (rely on local storage)
+            setAuthenticatedUserBookings(localBookings.filter(b => b.status === 'confirmed'));
           }
 
           // c) SYNC LOCAL STATUS: Mark local bookings as cancelled if they are not on the server anymore
-          let hasChanges = false;
-          const serverBookingIds = new Set(normalizedServerBookings.map(b => b.id));
-          
-          const updatedLocalBookings = currentLocalBookings.map(localBooking => {
-            if (localBooking.status === 'confirmed' && !serverBookingIds.has(localBooking.id)) {
-              hasChanges = true;
-              return { ...localBooking, status: 'cancelled' as const };
-            }
-            return localBooking;
-          });
+          if (localBookings.length > 0) {
+            let hasChanges = false;
+            const serverBookingIds = new Set(normalizedServerBookings.map(b => b.id));
+            
+            const updatedLocalBookings = localBookings.map(localBooking => {
+              // Safety check: Don't cancel bookings created in the last 15 seconds (race condition protection)
+              const isJustCreated = (Date.now() - localBooking.createdAt) < 15000;
 
-          if (hasChanges) {
-            saveLocalBookings(updatedLocalBookings);
+              if (localBooking.status === 'confirmed' && !serverBookingIds.has(localBooking.id) && !isJustCreated) {
+                hasChanges = true;
+                return { ...localBooking, status: 'cancelled' as const };
+              }
+              return localBooking;
+            });
+
+            if (hasChanges) {
+              saveLocalBookings(updatedLocalBookings);
+            }
           }
         }
       } catch (e) {
         console.error("Failed to fetch server bookings:", e);
         // On failure, rely on local data for user's own history
-        setAuthenticatedUserBookings(currentLocalBookings.filter(b => b.status === 'confirmed'));
+        setAuthenticatedUserBookings(localBookings.filter(b => b.status === 'confirmed'));
       }
-    };
+  }, [localBookings]); 
 
-    fetchServerBookings();
-  }, []);
+  // Polling Effect - Fetch data every 5 seconds (Reduced from 7s for better real-time feel)
+  useEffect(() => {
+    fetchServerBookings(); // Initial fetch
+    
+    const intervalId = setInterval(() => {
+      fetchServerBookings();
+    }, 5000); 
 
-  // Save local bookings
-  const saveLocalBookings = (newBookings: Booking[]) => {
-    setLocalBookings(newBookings);
-    try {
-      localStorage.setItem('barber_bookings', JSON.stringify(newBookings));
-    } catch (e) {
-      console.warn("Could not save bookings to storage");
-    }
-  };
+    return () => clearInterval(intervalId);
+  }, [fetchServerBookings]);
+
 
   const handleBookingComplete = async (bookingData: Omit<Booking, 'id' | 'status' | 'createdAt'>) => {
     const tgUser = getTelegramUser();
@@ -155,6 +184,8 @@ const App: React.FC = () => {
         },
         body: JSON.stringify(newBooking),
       });
+      // Force a refresh shortly after
+      setTimeout(fetchServerBookings, 1000);
     } catch (e) {
       console.error("Failed to sync booking with server", e);
     }
@@ -176,7 +207,7 @@ const App: React.FC = () => {
       b.id === id ? { ...b, status: 'cancelled' as const } : b
     ));
 
-    // 2. Server Update (Send cancellation event)
+    // 2. Server Update
     try {
       const bookingToCancel = localBookings.find(b => b.id === id);
       
@@ -192,6 +223,7 @@ const App: React.FC = () => {
             status: 'cancelled' 
           })
         });
+        setTimeout(fetchServerBookings, 1000);
       }
     } catch (e) {
       console.error("Failed to sync cancellation", e);
@@ -199,6 +231,9 @@ const App: React.FC = () => {
   };
 
   const handleStartBooking = (barberId?: string, serviceId?: string) => {
+    // Force refresh data before opening wizard to ensure slots are accurate
+    fetchServerBookings(); 
+    
     setPreSelectedBarberId(barberId);
     setPreSelectedServiceId(serviceId);
     setIsBookingOpen(true);
@@ -211,9 +246,8 @@ const App: React.FC = () => {
   };
   
   const allOccupiedBookings = [...serverBookings];
-  // Add unique local bookings to prevent double-counting but ensure immediate UI feedback
   localBookings.forEach(localB => {
-    if (!allOccupiedBookings.some(serverB => serverB.id === localB.id)) {
+    if (localB.status === 'confirmed' && !allOccupiedBookings.some(serverB => serverB.id === localB.id)) {
       allOccupiedBookings.push(localB);
     }
   });
@@ -264,8 +298,8 @@ const App: React.FC = () => {
             className="absolute inset-0 z-50 h-full w-full"
           >
             <BookingWizard 
-              bookings={allOccupiedBookings} // Pass GLOBAL bookings for slot blocking
-              userBookings={authenticatedUserBookings} // Pass PERSONAL bookings for daily limit
+              bookings={allOccupiedBookings} 
+              userBookings={authenticatedUserBookings} 
               onComplete={handleBookingComplete} 
               onCancel={handleCloseBooking} 
               initialBarberId={preSelectedBarberId}
