@@ -49,4 +49,5 @@ export enum AppView {
   HOME = 'HOME',
   BOOKING = 'BOOKING',
   MY_BOOKINGS = 'MY_BOOKINGS',
+  ADMIN = 'ADMIN',
 }

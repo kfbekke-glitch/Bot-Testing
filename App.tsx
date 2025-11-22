@@ -5,6 +5,7 @@ import { BottomNav } from './components/BottomNav';
 import { HomeView } from './components/HomeView';
 import { BookingWizard } from './components/BookingWizard';
 import { MyBookings } from './components/MyBookings';
+import { AdminView } from './components/AdminView'; // Import AdminView
 import { AppView, Booking } from './types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { initTelegramApp, getTelegramUser } from './utils/telegram';
@@ -143,12 +144,13 @@ const App: React.FC = () => {
               date: cleanDate,
               timeSlot: cleanTime,
               clientName: item.clientName || 'Occupied',
-              clientPhone: '',
+              clientPhone: item.clientPhone || '',
               price: item.price || 0,
               duration: duration, 
               status: 'confirmed',
               createdAt: item.createdAt || 0,
-              tgUserId: item.tgUserId ? String(item.tgUserId) : undefined
+              tgUserId: item.tgUserId ? String(item.tgUserId) : undefined,
+              tgUsername: item.tgUsername // Ensure this is passed if server sends it (needs server update to send username, but we'll prep for it)
             };
           });
           
@@ -236,7 +238,6 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("Failed to sync booking with server", e);
       setIsOffline(true);
-      // If it failed immediately, inform user
       setShowOfflineAlert(true);
     }
 
@@ -254,12 +255,18 @@ const App: React.FC = () => {
 
     const targetId = String(id);
 
+    // Optimistic UI update for Local Bookings
     const updated = localBookings.map(b => 
       String(b.id) === targetId ? { ...b, status: 'cancelled' as const } : b
     );
     saveLocalBookings(updated);
     
     setAuthenticatedUserBookings(prev => prev.map(b => 
+      String(b.id) === targetId ? { ...b, status: 'cancelled' as const } : b
+    ));
+    
+    // Also update server bookings locally to reflect change immediately in Admin panel
+    setServerBookings(prev => prev.map(b => 
       String(b.id) === targetId ? { ...b, status: 'cancelled' as const } : b
     ));
 
@@ -320,7 +327,6 @@ const App: React.FC = () => {
     >
       <Header />
       
-      {/* Offline Indicator */}
       <AnimatePresence>
         {isOffline && (
           <motion.div
@@ -368,6 +374,22 @@ const App: React.FC = () => {
               />
             </motion.div>
           )}
+
+          {currentView === AppView.ADMIN && (
+            <motion.div 
+              key="admin"
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 overflow-y-auto no-scrollbar w-full h-full"
+            >
+              <AdminView 
+                bookings={serverBookings}
+                onDeleteBooking={handleCancelBooking}
+              />
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
       <BottomNav currentView={currentView} onNavigate={setCurrentView} />
@@ -393,7 +415,6 @@ const App: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Offline Blocking Alert */}
       <Modal 
         isOpen={showOfflineAlert}
         onClose={() => setShowOfflineAlert(false)}

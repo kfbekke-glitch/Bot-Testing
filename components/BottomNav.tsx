@@ -1,18 +1,36 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppView } from '../types';
-import { Home, Calendar } from 'lucide-react';
+import { Home, Calendar, ShieldCheck } from 'lucide-react';
+import { getTelegramUser } from '../utils/telegram';
 
 interface BottomNavProps {
   currentView: AppView;
   onNavigate: (view: AppView) => void;
 }
 
+const ADMIN_ID = 1741045757;
+
 export const BottomNav: React.FC<BottomNavProps> = ({ currentView, onNavigate }) => {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const user = getTelegramUser();
+    if (user && user.id === ADMIN_ID) {
+      setIsAdmin(true);
+    }
+    // Fallback for testing in browser if no user (Uncomment to test admin in browser)
+    // setIsAdmin(true); 
+  }, []);
+
   const navItems = [
     { view: AppView.HOME, icon: Home, label: 'Главная' },
     { view: AppView.MY_BOOKINGS, icon: Calendar, label: 'Мои Записи' },
   ];
+
+  if (isAdmin) {
+    navItems.push({ view: AppView.ADMIN, icon: ShieldCheck, label: 'Админ' });
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 z-40 pb-safe-bottom">
