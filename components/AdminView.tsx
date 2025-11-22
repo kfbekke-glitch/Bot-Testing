@@ -334,7 +334,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ bookings, onDeleteBooking,
         date: selectedDate,
         timeSlot: createTime,
         clientName: createName,
-        clientPhone: createPhone,
+        clientPhone: `+7${createPhone}`, // Add prefix
         price,
         duration
       };
@@ -370,6 +370,36 @@ export const AdminView: React.FC<AdminViewProps> = ({ bookings, onDeleteBooking,
     await onCreateBooking(payload);
     setIsCreating(false);
     setIsCreatorOpen(false);
+  };
+
+  // --- PHONE FORMATTING LOGIC (Shared) ---
+  const formatPhone = (raw: string) => {
+    let display = '';
+    if (raw.length > 0) display += `(${raw.substring(0, 3)}`;
+    if (raw.length >= 3) display += `) ${raw.substring(3, 6)}`;
+    if (raw.length >= 6) display += `-${raw.substring(6, 8)}`;
+    if (raw.length >= 8) display += `-${raw.substring(8, 10)}`;
+    return display;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    const rawInput = inputValue.replace(/\D/g, '');
+    
+    let newRaw = rawInput;
+    if (rawInput.length > 10) {
+        if (rawInput.startsWith('7') || rawInput.startsWith('8')) {
+            newRaw = rawInput.substring(1);
+        }
+    }
+    newRaw = newRaw.substring(0, 10);
+
+    if (newRaw === createPhone && inputValue.length < formatPhone(createPhone).length) {
+        setCreatePhone(newRaw.slice(0, -1));
+        return;
+    }
+
+    setCreatePhone(newRaw);
   };
 
   const renderStatusBadge = (status: BookingStatus, isBlock: boolean) => {
@@ -772,12 +802,16 @@ export const AdminView: React.FC<AdminViewProps> = ({ bookings, onDeleteBooking,
                      </div>
                      <div>
                         <label className="text-[10px] font-bold text-zinc-500 uppercase mb-1 block">Телефон</label>
-                        <input 
-                          value={createPhone}
-                          onChange={(e) => setCreatePhone(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white text-sm outline-none focus:border-amber-600"
-                          placeholder="+7..."
-                        />
+                        <div className="flex items-center bg-zinc-950 rounded overflow-hidden border border-zinc-800 focus-within:border-amber-600 px-2 py-2">
+                           <span className="text-zinc-400 text-sm font-mono mr-2">+7</span>
+                           <input 
+                             type="tel"
+                             value={formatPhone(createPhone)}
+                             onChange={handlePhoneChange}
+                             className="w-full bg-transparent border-none p-0 text-white text-sm outline-none font-mono"
+                             placeholder="(999) 000-00-00"
+                           />
+                        </div>
                      </div>
                   </div>
                 )}
@@ -787,7 +821,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ bookings, onDeleteBooking,
                  <Button 
                    fullWidth 
                    onClick={handleSubmitBooking}
-                   disabled={!createBarber || (!createService && !createBlockType) || (!createTime && createBlockType !== 'DAY_OFF') || (createMode === 'client' && !createName) || isCreating}
+                   disabled={
+                      !createBarber || 
+                      (!createService && !createBlockType) || 
+                      (!createTime && createBlockType !== 'DAY_OFF') || 
+                      (createMode === 'client' && (!createName || createPhone.length !== 10)) || 
+                      isCreating
+                   }
                  >
                    {isCreating ? 'Обработка...' : createMode === 'client' ? 'Создать запись' : 'Установить блокировку'}
                  </Button>

@@ -296,12 +296,37 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
     }
   };
 
+  // --- PHONE FORMATTING LOGIC ---
+  const formatPhone = (raw: string) => {
+    let display = '';
+    if (raw.length > 0) display += `(${raw.substring(0, 3)}`;
+    if (raw.length >= 3) display += `) ${raw.substring(3, 6)}`;
+    if (raw.length >= 6) display += `-${raw.substring(6, 8)}`;
+    if (raw.length >= 8) display += `-${raw.substring(8, 10)}`;
+    return display;
+  };
+
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, '');
-    if (val.length === 0) { setPhone(''); return; }
-    if (val.startsWith('7') || val.startsWith('8')) val = val.substring(1);
-    if (val.length > 10) val = val.substring(0, 10);
-    setPhone(val);
+    const inputValue = e.target.value;
+    const rawInput = inputValue.replace(/\D/g, '');
+    
+    // Handle paste with country code
+    let newRaw = rawInput;
+    if (rawInput.length > 10) {
+        if (rawInput.startsWith('7') || rawInput.startsWith('8')) {
+            newRaw = rawInput.substring(1);
+        }
+    }
+    newRaw = newRaw.substring(0, 10);
+
+    // Handle separator deletion (if user backspaces a non-digit, we remove the digit before it)
+    // Check if the raw value hasn't changed but the input length decreased (meaning a separator was deleted)
+    if (newRaw === phone && inputValue.length < formatPhone(phone).length) {
+        setPhone(newRaw.slice(0, -1));
+        return;
+    }
+
+    setPhone(newRaw);
   };
 
   const canProceed = () => {
@@ -650,7 +675,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
                   <label className="text-xs font-bold text-zinc-500 uppercase mb-2 block">Телефон</label>
                   <div className="flex items-center bg-zinc-900 rounded-xl overflow-hidden px-4 py-4 focus-within:ring-2 focus-within:ring-amber-600">
                     <span className="text-zinc-400 text-lg font-mono mr-2">+7</span>
-                    <input type="tel" value={phone} onChange={handlePhoneChange} className="flex-1 bg-transparent border-none p-0 text-white text-lg font-mono focus:ring-0 placeholder-zinc-700 outline-none" placeholder="900 000 00 00" />
+                    <input 
+                      type="tel" 
+                      value={formatPhone(phone)} 
+                      onChange={handlePhoneChange} 
+                      className="flex-1 bg-transparent border-none p-0 text-white text-lg font-mono focus:ring-0 placeholder-zinc-700 outline-none" 
+                      placeholder="(999) 000-00-00" 
+                    />
                   </div>
                 </div>
               </div>
