@@ -95,7 +95,23 @@ const App: React.FC = () => {
     }
   };
 
-  const getFallbackDuration = (barberId: string, serviceId: string): number => {
+  const getFallbackDuration = (barberId: string, serviceId: string, timeSlot?: string): number => {
+     // Handle Technical Blocks (Lunch, Day Off, Early)
+     if (serviceId === 'block_lunch') return 60;
+     if (serviceId === 'block_day_off') return 660;
+     if (serviceId === 'block_early') {
+        // Calculate dynamic duration from start time until 21:00
+        if (timeSlot) {
+          const [h, m] = timeSlot.split(':').map(Number);
+          if (!isNaN(h)) {
+             const startMins = h * 60 + (isNaN(m) ? 0 : m);
+             const endMins = 21 * 60; // 21:00
+             return Math.max(30, endMins - startMins);
+          }
+        }
+        return 180; // Fallback if time parsing fails
+     }
+
      const barber = BARBERS.find(b => String(b.id) === String(barberId));
      if (!barber) return 45;
      const service = barber.services.find(s => String(s.serviceId) === String(serviceId));
@@ -135,7 +151,8 @@ const App: React.FC = () => {
             const sId = item.serviceId || 'unknown';
             const cleanTime = normalizeTimeSlot(item.timeSlot);
             const cleanDate = normalizeDate(item.date);
-            const duration = item.duration || getFallbackDuration(bId, sId);
+            // Use updated fallback logic to ensure blocks like "Early" get correct duration
+            const duration = item.duration || getFallbackDuration(bId, sId, cleanTime);
 
             return {
               id: item.id ? String(item.id) : `server_${Math.random()}`, 

@@ -432,22 +432,27 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
           <div className="h-px flex-1 bg-zinc-800/50"></div>
         </div>
         <div className="grid grid-cols-4 gap-3">
-          {slots.map((slot) => (
+          {slots.map((slot) => {
+            const isEarlyLeave = slot.label === 'УШЕЛ';
+            
+            return (
             <button
               key={slot.id}
               disabled={!slot.available}
               onClick={() => handleTimeSelect(slot)}
               className={`
                 relative py-2 rounded-lg font-mono font-bold text-sm transition-all active:scale-95 overflow-hidden flex items-center justify-center
-                ${!slot.available 
-                  ? 'bg-zinc-900/50 text-zinc-600 cursor-not-allowed border border-zinc-800' 
-                  : selectedTime?.id === slot.id 
-                    ? 'bg-amber-600 text-black shadow-lg shadow-amber-600/40' 
-                    : 'bg-zinc-800 text-white hover:bg-zinc-700'}
+                ${isEarlyLeave 
+                  ? 'bg-transparent border-transparent opacity-50' 
+                  : !slot.available 
+                     ? 'bg-zinc-900/50 text-zinc-600 cursor-not-allowed border border-zinc-800' 
+                     : selectedTime?.id === slot.id 
+                       ? 'bg-amber-600 text-black shadow-lg shadow-amber-600/40' 
+                       : 'bg-zinc-800 text-white hover:bg-zinc-700'}
               `}
             >
               {slot.label ? (
-                 <span className={`text-[10px] font-black uppercase tracking-wide ${slot.label === 'ОБЕД' ? 'text-amber-700/70' : 'text-red-900/70'}`}>
+                 <span className={`text-[10px] font-black uppercase tracking-wide ${slot.label === 'ОБЕД' ? 'text-amber-700/70' : 'text-red-700/70'}`}>
                    {slot.label}
                  </span>
               ) : (
@@ -460,7 +465,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({ bookings, userBook
                  </div>
               )}
             </button>
-          ))}
+          )})}
         </div>
       </div>
     );
